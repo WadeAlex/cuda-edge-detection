@@ -207,7 +207,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="$(CUDA_INC_PATH);./;../../common/inc"
+				AdditionalIncludeDirectories="&quot;$(CUDA_INC_PATH)&quot;;./;../../common/inc;&quot;C:\Development\CDA6938\project2\NVIDIA CUDA SDK\projects\EdgeDetection\include&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -781,12 +781,20 @@
 				RelativePath=".\EdgeDetection.h"
 				>
 			</File>
+			<File
+				RelativePath=".\ImageHandler.h"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Source Files"
 			>
 			<File
 				RelativePath=".\EdgeDetection.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\ImageHandler.cpp"
 				>
 			</File>
 		</Filter>
