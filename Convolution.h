@@ -1,0 +1,1 @@
+void performConvolution(float* kernel, float* matrix, float* result);
