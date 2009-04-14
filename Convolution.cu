@@ -12,31 +12,8 @@
 texture<float, 2, cudaReadModeElementType> deviceATexture;
 __device__ __constant__ float deviceH[H_DIMENSION * H_DIMENSION];
 
-__global__ void unoptimizedConvolution(float* a, float* h, float* c)
+__global__ void convolution(float* c)
 {
-	int outputRow = threadIdx.y;
-	int outputColumn = threadIdx.x;
-
-	float accumulator = 0.0;
-
-	for(int i = 0; i < H_DIMENSION; ++i)
-	{
-		for(int j = 0; j < H_DIMENSION; ++j)
-		{
-			if(outputColumn - i >= 0 && outputColumn - i < A_DIMENSION && outputRow - j >= 0 && outputRow - j < A_DIMENSION)
-			{
-				accumulator += h[i * H_DIMENSION + j] * a[(outputColumn - i) * A_DIMENSION + outputRow - j];
-			}
-		}
-	}
-
-	c[outputRow * A_DIMENSION + outputColumn] = accumulator;
-}
-
-__global__ void optimizedConvolution(float* c)
-{
-	printf("HI\n");
-	
 	int outputRow = blockIdx.y;
 	int outputColumn = blockIdx.x;
 
@@ -56,67 +33,6 @@ __global__ void optimizedConvolution(float* c)
 	c[outputRow * C_DIMENSION + outputColumn] = accumulator;
 }
 
-float generateRandomValue(float lowValue, float highValue)
-{
-	return (float)(rand() / ((float)RAND_MAX + 1.0) * (highValue - lowValue) + lowValue);
-}
-
-void populateMatrix(float* matrix, unsigned dimension, float initialValue, bool pad)
-{
-	for(unsigned i = 0; i < dimension; ++i)
-	{
-		for(unsigned j = 0; j < dimension; ++j)
-		{
-			if(!pad || (i > 0 && j > 0 && i < dimension - 1 && j < dimension - 1))
-			{
-				matrix[i * dimension + j] = initialValue;
-			}
-			else
-			{
-				matrix[i * dimension + j] = 0;
-			}
-		}
-	}
-}
-
-void populateMatrix(float* matrix, unsigned dimension, float lowValue, float highValue, bool pad)
-{
-	for(unsigned i = 0; i < dimension; ++i)
-	{
-		for(unsigned j = 0; j < dimension; ++j)
-		{
-			if(!pad || (i > 0 && j > 0 && i < dimension - 1 && j < dimension - 1))
-			{
-				matrix[i * dimension + j] = generateRandomValue(lowValue, highValue);
-			}
-			else
-			{
-				matrix[i * dimension + j] = 0;
-			}
-		}
-	}
-}
-
-void writeToCsvFile(const char* filename, float* matrix, unsigned dimension)
-{
-	// Open the file
-	FILE* outputFile;
-	outputFile = fopen(filename, "w");
-
-	// Write values to it
-	printf("Writing results to CSV file.\n");
-	for(unsigned i = 1; i < dimension - 1; ++i)
-	{
-		for(unsigned j = 1; j < dimension - 1; ++j)
-		{
-			fprintf(outputFile, "%f,", matrix[i * dimension + j]);
-		}
-		fprintf(outputFile, "\n");
-	}
-
-	fclose(outputFile);
-}
-
 void performConvolution(float* kernel, float* image, float* result)
 {
 	srand((unsigned)time(NULL));
@@ -134,10 +50,9 @@ void performConvolution(float* kernel, float* image, float* result)
 	float* hostA = (float*)malloc(memSizeA);
 	float* hostH = (float*)malloc(memSizeH);
 	float* hostC = (float*)calloc(1, memSizeC);
-	//populateMatrix(hostA, A_DIMENSION, 0.0, 100.0, true);
-	//populateMatrix(hostH, H_DIMENSION, 0.0, 100.0, false);
-	populateMatrix(hostA, A_DIMENSION, 7.0, true);
-	populateMatrix(hostH, H_DIMENSION, 3.0, false);
+
+	//populateMatrix(hostA, A_DIMENSION, 7.0, true);
+	//populateMatrix(hostH, H_DIMENSION, 3.0, false);
 
 	// Set up device arrays.
 	cudaArray* deviceAArray = NULL;
@@ -161,7 +76,7 @@ void performConvolution(float* kernel, float* image, float* result)
 	// Do it!
 	dim3 dimGrid(C_DIMENSION, C_DIMENSION);
 	dim3 dimBlock(16, 16);
-	optimizedConvolution<<<dimGrid, dimBlock>>>(deviceCArray);
+	convolution<<<dimGrid, dimBlock>>>(deviceCArray);
 
 	// Check for errors.
 	CUT_CHECK_ERROR("Kernel execution failed!");
@@ -173,9 +88,6 @@ void performConvolution(float* kernel, float* image, float* result)
     CUT_SAFE_CALL(cutStopTimer(timer));
     printf("Processing time for %dx%d matrix: %f ms\n", A_DIMENSION, A_DIMENSION, cutGetTimerValue(timer));
     CUT_SAFE_CALL(cutDeleteTimer(timer));
-
-	// Write result to disk.
-	writeToCsvFile("output.csv", hostC, C_DIMENSION);
 
 	// Free memory.
 	free(hostA);
