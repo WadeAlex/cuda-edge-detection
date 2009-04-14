@@ -207,7 +207,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(CUDA_INC_PATH)&quot;;./;../../common/inc;&quot;C:\Development\CDA6938\project2\NVIDIA CUDA SDK\projects\EdgeDetection\include&quot;"
+				AdditionalIncludeDirectories="&quot;$(CUDA_INC_PATH)&quot;;./;../../common/inc;&quot;C:\Program Files\ImageMagick-6.5.1-Q16\include&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -228,10 +228,10 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="cudart.lib cutil32D.lib"
-				OutputFile="../../bin/win32/$(ConfigurationName)/EdgeDetection.exe"
+				AdditionalDependencies="cudart.lib cutil32D.lib CORE_RL_Magick++_.lib"
+				OutputFile="$(ConfigurationName)/EdgeDetection.exe"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="$(CUDA_LIB_PATH);../../common/lib"
+				AdditionalLibraryDirectories="&quot;$(CUDA_LIB_PATH)&quot;;../../common/lib;lib;&quot;C:\Program Files\ImageMagick-6.5.1-Q16\lib&quot;"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)/EdgeDetection.pdb"
 				SubSystem="1"
@@ -270,6 +270,7 @@
 			IntermediateDirectory="$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
+			UseOfMFC="2"
 			CharacterSet="2"
 			>
 			<Tool
@@ -290,7 +291,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="$(CUDA_INC_PATH);./;../../common/inc"
+				AdditionalIncludeDirectories="$(CUDA_INC_PATH);./;../../common/inc;include;&quot;C:\Program Files\ImageMagick-6.5.1-Q16\include&quot;"
 				PreprocessorDefinitions="WIN32;_CONSOLE"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
@@ -309,10 +310,10 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="cudart.lib cutil32.lib"
+				AdditionalDependencies="cudart.lib cutil32.lib CORE_RL_Magick++_.lib"
 				OutputFile="../../bin/win32/$(ConfigurationName)/EdgeDetection.exe"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="$(CUDA_LIB_PATH);../../common/lib"
+				AdditionalLibraryDirectories="&quot;$(CUDA_LIB_PATH)&quot;;../../common/lib;lib;&quot;C:\Program Files\ImageMagick-6.5.1-Q16\lib&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				OptimizeReferences="2"
