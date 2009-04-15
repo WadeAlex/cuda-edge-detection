@@ -14,7 +14,10 @@ class EdgeDetection
 
 		static const int xGradientMask[9];
 		static const int yGradientMask[9];
+		static const int gaussianMask[25];
 	private:
-		void computeImageGradient(uint16_t* imageMatrix, unsigned* imageGradient);
+		void smoothImage(int* outputSmoothedImage) const;
+		void computeImageGradient(int* inputImageMatrix, unsigned* outputImageGradient) const;
+		void performConvolution(int* inputMatrix, int matrixWidth, const int* mask, int maskWidth, int* outputMatrix) const;
 		ImageHandler imgHandler;
 };
