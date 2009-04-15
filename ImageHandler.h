@@ -14,14 +14,12 @@ class ImageHandler
 		~ImageHandler();
 
 		void loadImage(const string& filename);
-		uint16_t* getMatrix();
-		void writeImage(const string& filename) const;
+		uint16_t* getMatrix() const;
+		void writeImage(uint16_t* imageMatrix, unsigned imageWidth, const string& filename) const;
 		unsigned getImagePixelCount() const;
-		unsigned getImageRowCount() const;
-		unsigned getImageColumnCount() const;
+		unsigned getImageWidth() const;
 
 	private:
 		uint16_t* matrix;
-		unsigned imageRowCount;
-		unsigned imageColumnCount;
+		unsigned imageWidth;
 };
