@@ -9,7 +9,7 @@
 
 using namespace std;
 
-#define USE_GPU
+//#define USE_GPU
 
 EdgeDetection::EdgeDetection()
 :
@@ -32,14 +32,14 @@ void EdgeDetection::loadInputImage(const char* filename)
 void EdgeDetection::performEdgeDetection()
 {
 	// Perform smoothing
-	startTimer();
+	//startTimer();
 	smoothImage();
-	this->imgHandler.writeImage(this->imgHandler.getMatrix(), "smoothed.png", true);
-	return;
+	//this->imgHandler.writeImage(this->imgHandler.getMatrix(), "smoothed.png", true);
+	//return;
 	// Compute image gradient
 	float* gradientMagnitude = new float[this->imgHandler.getImagePixelCount()];
 	computeImageGradient(gradientMagnitude);
-	//this->imgHandler.writeImage(gradientMagnitude, "gradient.png", false);
+	//this->imgHandler.writeImage(gradientMagnitude, "gradient.png", true);
 
 	// Compute edge directions
 	float* edgeDirections = new float[this->imgHandler.getImagePixelCount()];
@@ -48,18 +48,18 @@ void EdgeDetection::performEdgeDetection()
 	// Snap and classify edge directions
 	unsigned* edgeDirectionClassifications = new unsigned[this->imgHandler.getImagePixelCount()];
 	classifyEdgeDirections(edgeDirections, edgeDirectionClassifications);
-	//this->imgHandler.writeEdgeDirectionImage(edgeDirectionClassifications, gradientMagnitude, "edgeDirections.png");
 
 	// Perform nonmaximum suppression
 	suppressNonmaximums(gradientMagnitude, edgeDirectionClassifications);
-	//this->imgHandler.writeImage(gradientMagnitude, "gradient.png", true);
+	//this->imgHandler.writeImage(gradientMagnitude, "nonmaximumSuppression.png", true);
+	//this->imgHandler.writeEdgeDirectionImage(edgeDirectionClassifications, gradientMagnitude, "edgeDirections.png", 5000);
 
 	// Perform hysteresis
 	float* outputEdges = new float[this->imgHandler.getImagePixelCount()];
 	memset(outputEdges, 0, sizeof(float) * this->imgHandler.getImagePixelCount());
-	performHysteresis(gradientMagnitude, 3500.0, 50.0, outputEdges);
-	stopTimer();
-	cout << "Total time was: " << getElapsedTime();
+	performHysteresis(gradientMagnitude, 11000.0, 25.0, outputEdges);
+	//stopTimer();
+	//cout << "Total time was: " << getElapsedTime() * 1000;
 
 	this->imgHandler.writeImage(outputEdges, "edges.png", false);
 
@@ -100,7 +100,11 @@ void EdgeDetection::computeEdgeDirections(float* outputEdgeDirections) const
 {
 	for(unsigned i = 0; i < this->imgHandler.getImagePixelCount(); ++i)
 	{
+#ifdef USE_GPU
+		outputEdgeDirections[i] = static_cast<float>(atan2(yGradient[i], xGradient[i]) * (180 / 3.14159265) + 180.0);
+#else
 		outputEdgeDirections[i] = static_cast<float>(atan2(xGradient[i], yGradient[i]) * (180 / 3.14159265) + 180.0);
+#endif
 	}
 }
 
@@ -135,7 +139,7 @@ void EdgeDetection::classifyEdgeDirections(float* edgeDirections, unsigned* edge
 		}
 		else
 		{
-			cerr << "Classifying bad edge direction as 0.  Edge direction was " << edgeDirection << endl;
+			//cerr << "Classifying bad edge direction as 0.  Edge direction was " << edgeDirection << endl;
 			edgeDirectionClassifications[i] = 0;
 		}
 	}
@@ -171,7 +175,11 @@ void EdgeDetection::suppressNonmaximums(float* imageGradient, unsigned* edgeDire
 			}
 			else
 			{
-				counterClockwisePerpendicularValue = imageGradient[counterClockwisePerpendicularIndex];
+				//if(counterClockwisePerpendicularIndex < static_cast<int>(this->imgHandler.getImagePixelCount()) &&
+				//	counterClockwisePerpendicularIndex >= 0)
+				//{
+					counterClockwisePerpendicularValue = imageGradient[counterClockwisePerpendicularIndex];
+				//}
 			}
 			//cout << counterClockwisePerpendicularValue << "." << endl;
 			if
@@ -350,6 +358,7 @@ void EdgeDetection::smoothImage()
 
 void EdgeDetection::performConvolution(const float* inputMatrix, int matrixWidth, const float* mask, int maskWidth, float maskWeight, float* outputMatrix) const
 {
+	startTimer();
 	int maskOffset = (maskWidth - 1) / 2;
 
 	for(int outputRow = 0; outputRow < matrixWidth; ++outputRow)
@@ -382,6 +391,8 @@ void EdgeDetection::performConvolution(const float* inputMatrix, int matrixWidth
 			outputMatrix[outputRow * matrixWidth + outputColumn] = accumulator / maskWeight;
 		}
 	}
+	stopTimer();
+	cout << "Elapsed convolution time: " << getElapsedTime() * 1000 << endl;
 }
 
 const float EdgeDetection::xGradientMask[9] = 
@@ -408,7 +419,7 @@ const float EdgeDetection::gaussianMask[25] =
 };
 
 const float EdgeDetection::gaussianMaskWeight = 159;
-void startIt();
+
 int main(char** argv, int argc)
 {
 	/*if(argc != 3)
