@@ -1,6 +1,7 @@
 #include "EdgeDetection.h"
 #include "Convolution.h"
 #include "ImageHandler.h"
+#include "Timer.h"
 
 #include <iostream>
 #include <cmath>
@@ -31,6 +32,7 @@ void EdgeDetection::loadInputImage(const char* filename)
 void EdgeDetection::performEdgeDetection()
 {
 	// Perform smoothing
+	startTimer();
 	smoothImage();
 	this->imgHandler.writeImage(this->imgHandler.getMatrix(), "smoothed.png", true);
 	return;
@@ -56,6 +58,9 @@ void EdgeDetection::performEdgeDetection()
 	float* outputEdges = new float[this->imgHandler.getImagePixelCount()];
 	memset(outputEdges, 0, sizeof(float) * this->imgHandler.getImagePixelCount());
 	performHysteresis(gradientMagnitude, 3500.0, 50.0, outputEdges);
+	stopTimer();
+	cout << "Total time was: " << getElapsedTime();
+
 	this->imgHandler.writeImage(outputEdges, "edges.png", false);
 
 	delete[] gradientMagnitude;

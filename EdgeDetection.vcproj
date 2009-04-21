@@ -687,20 +687,6 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\2dConvolution.cu"
-				>
-				<FileConfiguration
-					Name="EmuRelease|Win32"
-					>
-					<Tool
-						Name="VCCustomBuildTool"
-						CommandLine="&quot;$(CUDA_BIN_PATH)\nvcc.exe&quot; -ccbin &quot;$(VCInstallDir)bin&quot; -deviceemu -c -DWIN32 -D_CONSOLE -D_MBCS -Xcompiler /EHsc,/W3,/nologo,/Wp64,/O2,/Zi,/MT -I&quot;$(CUDA_INC_PATH)&quot; -I./ -I../../common/inc -o $(ConfigurationName)\$(InputName).obj $(InputFileName)"
-						AdditionalDependencies="$(InputName)_kernel.cu"
-						Outputs="$(ConfigurationName)\$(InputName).obj"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
 				RelativePath=".\Convolution.cu"
 				>
 				<FileConfiguration
@@ -798,6 +784,10 @@
 			</File>
 			<File
 				RelativePath=".\ImageHandler.h"
+				>
+			</File>
+			<File
+				RelativePath=".\Timer.h"
 				>
 			</File>
 		</Filter>
