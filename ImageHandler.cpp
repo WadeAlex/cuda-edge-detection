@@ -35,7 +35,14 @@ void ImageHandler::loadImage(const string& filename)
 			for(unsigned j = 0; j < img.columns(); ++j)
 			{
 				unsigned index = i * img.columns() + j;
-				this->matrix[index] = static_cast<float>(imgPixels[index].red);
+				if(i == 0 || j == 0 || i == img.rows() - 1 || j == img.columns() - 1)
+				{
+					this->matrix[index] = 0;
+				}
+				else
+				{
+					this->matrix[index] = static_cast<float>(imgPixels[index].red);
+				}
 			}
 		}
 	}
