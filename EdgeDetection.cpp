@@ -32,7 +32,7 @@ void EdgeDetection::loadInputImage(const char* filename)
 void EdgeDetection::performEdgeDetection()
 {
 	// Perform smoothing
-	//startTimer();
+	startTimer();
 	smoothImage();
 	//this->imgHandler.writeImage(this->imgHandler.getMatrix(), "smoothed.png", true);
 	//return;
@@ -58,8 +58,8 @@ void EdgeDetection::performEdgeDetection()
 	float* outputEdges = new float[this->imgHandler.getImagePixelCount()];
 	memset(outputEdges, 0, sizeof(float) * this->imgHandler.getImagePixelCount());
 	performHysteresis(gradientMagnitude, 11000.0, 25.0, outputEdges);
-	//stopTimer();
-	//cout << "Total time was: " << getElapsedTime() * 1000;
+	stopTimer();
+	cout << "Total time was: " << getElapsedTime() * 1000;
 
 	this->imgHandler.writeImage(outputEdges, "edges.png", false);
 
@@ -175,11 +175,11 @@ void EdgeDetection::suppressNonmaximums(float* imageGradient, unsigned* edgeDire
 			}
 			else
 			{
-				//if(counterClockwisePerpendicularIndex < static_cast<int>(this->imgHandler.getImagePixelCount()) &&
-				//	counterClockwisePerpendicularIndex >= 0)
-				//{
+				if(counterClockwisePerpendicularIndex < static_cast<int>(this->imgHandler.getImagePixelCount()) &&
+					counterClockwisePerpendicularIndex >= 0)
+				{
 					counterClockwisePerpendicularValue = imageGradient[counterClockwisePerpendicularIndex];
-				//}
+				}
 			}
 			//cout << counterClockwisePerpendicularValue << "." << endl;
 			if
@@ -358,7 +358,7 @@ void EdgeDetection::smoothImage()
 
 void EdgeDetection::performConvolution(const float* inputMatrix, int matrixWidth, const float* mask, int maskWidth, float maskWeight, float* outputMatrix) const
 {
-	startTimer();
+	//startTimer();
 	int maskOffset = (maskWidth - 1) / 2;
 
 	for(int outputRow = 0; outputRow < matrixWidth; ++outputRow)
@@ -391,8 +391,8 @@ void EdgeDetection::performConvolution(const float* inputMatrix, int matrixWidth
 			outputMatrix[outputRow * matrixWidth + outputColumn] = accumulator / maskWeight;
 		}
 	}
-	stopTimer();
-	cout << "Elapsed convolution time: " << getElapsedTime() * 1000 << endl;
+	//stopTimer();
+	//cout << "Elapsed convolution time: " << getElapsedTime() * 1000 << endl;
 }
 
 const float EdgeDetection::xGradientMask[9] = 
@@ -430,7 +430,7 @@ int main(char** argv, int argc)
 
 	EdgeDetection edgeDetector;
 
-	edgeDetector.loadInputImage(/*argv[0]*/"C:\\Documents and Settings\\awade\\Desktop\\NVIDIA CUDA SDK\\projects\\EdgeDetection\\test.png");
+	edgeDetector.loadInputImage(/*argv[0]*/"C:\\Documents and Settings\\awade\\Desktop\\NVIDIA CUDA SDK\\projects\\EdgeDetection\\test-2048.png");
 	edgeDetector.performEdgeDetection();
 	edgeDetector.exportEdgeImage(/*argv[1]*/"");
 
