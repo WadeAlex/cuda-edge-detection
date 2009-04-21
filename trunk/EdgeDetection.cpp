@@ -414,7 +414,7 @@ int main(char** argv, int argc)
 
 	EdgeDetection edgeDetector;
 
-	edgeDetector.loadInputImage(/*argv[0]*/"C:\\Development\\CDA6938\\project2\\NVIDIA CUDA SDK\\projects\\EdgeDetection\\test.png");
+	edgeDetector.loadInputImage(/*argv[0]*/"C:\\Documents and Settings\\awade\\Desktop\\NVIDIA CUDA SDK\\projects\\EdgeDetection\\test.png");
 	edgeDetector.performEdgeDetection();
 	edgeDetector.exportEdgeImage(/*argv[1]*/"");
 
