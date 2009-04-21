@@ -136,7 +136,7 @@ void performConvolutionGpu(const float* inputMatrix, int matrixWidth, float* out
 
 	// Stop and destroy timer, print results.
     CUT_SAFE_CALL(cutStopTimer(timer));
-    printf("Processing time for %dx%d matrix: %f ms\n", matrixWidth, matrixWidth, cutGetTimerValue(timer));
+    //printf("Processing time for %dx%d matrix: %f ms\n", matrixWidth, matrixWidth, cutGetTimerValue(timer));
     CUT_SAFE_CALL(cutDeleteTimer(timer));
 
 	CUDA_SAFE_CALL(cudaFreeArray(deviceMatrixArray));
