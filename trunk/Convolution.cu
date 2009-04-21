@@ -6,16 +6,15 @@
 
 #include "Convolution.h"
 
-//texture<float, 2, cudaReadModeElementType> deviceMatrixTexture;
-__device__ float* deviceMatrixArray;
+texture<float, 2, cudaReadModeElementType> deviceMatrixTexture;
 __device__ __constant__ float deviceXGradientMask[9];
 __device__ __constant__ float deviceYGradientMask[9];
 __device__ __constant__ float deviceGaussianFilterMask[25];
 
 __global__ void deviceXGradientConvolution(float* output, unsigned matrixWidth)
 {
-	int outputRow = blockIdx.y;
-	int outputColumn = blockIdx.x;
+	int outputRow = blockIdx.y * blockDim.y + threadIdx.y;
+	int outputColumn = blockIdx.x * blockDim.x + threadIdx.x;
 
 	float accumulator = 0.0;
 
@@ -26,8 +25,7 @@ __global__ void deviceXGradientConvolution(float* output, unsigned matrixWidth)
 #pragma unroll
 		for(int j = -1; j <= 1; ++j)
 		{
-			accumulator += deviceXGradientMask[(1 + i)* 3 + (1 + j)] * deviceMatrixArray[matrixColumn * matrixWidth + outputRow +j];
-				//tex2D(deviceMatrixTexture, matrixColumn, outputRow + j);
+			accumulator += deviceXGradientMask[(1 + i)* 3 + (1 + j)] * tex2D(deviceMatrixTexture, matrixColumn, outputRow + j);
 		}
 	}
 
@@ -36,8 +34,8 @@ __global__ void deviceXGradientConvolution(float* output, unsigned matrixWidth)
 
 __global__ void deviceYGradientConvolution(float* output, unsigned matrixWidth)
 {
-	int outputRow = blockIdx.y;
-	int outputColumn = blockIdx.x;
+	int outputRow = blockIdx.y * blockDim.y + threadIdx.y;
+		int outputColumn = blockIdx.x * blockDim.x + threadIdx.x;
 
 	float accumulator = 0.0;
 
@@ -48,8 +46,7 @@ __global__ void deviceYGradientConvolution(float* output, unsigned matrixWidth)
 #pragma unroll
 		for(int j = -1; j <= 1; ++j)
 		{
-			accumulator += deviceYGradientMask[(1 + i)* 3 + (1 + j)] * deviceMatrixArray[matrixColumn * matrixWidth + outputRow +j];
-			//tex2D(deviceMatrixTexture, matrixColumn, outputRow + j);
+			accumulator += deviceYGradientMask[(1 + i)* 3 + (1 + j)] * tex2D(deviceMatrixTexture, matrixColumn, outputRow + j);
 		}
 	}
 
@@ -58,8 +55,8 @@ __global__ void deviceYGradientConvolution(float* output, unsigned matrixWidth)
 
 __global__ void deviceGaussianConvolution(float* output, unsigned matrixWidth)
 {
-	int outputRow = blockIdx.y;
-	int outputColumn = blockIdx.x;
+	int outputRow = blockIdx.y * blockDim.y + threadIdx.y;
+	int outputColumn = blockIdx.x * blockDim.x + threadIdx.x;
  
 	float accumulator = 0.0;
 
@@ -70,8 +67,7 @@ __global__ void deviceGaussianConvolution(float* output, unsigned matrixWidth)
 #pragma unroll
 		for(int j = -2; j <= 2; ++j)
 		{
-			accumulator += deviceGaussianFilterMask[(2 + i)* 3 + (2 + j)] * deviceMatrixArray[matrixColumn * matrixWidth + outputRow +j];
-			//tex2D(deviceMatrixTexture, matrixColumn, outputRow + j);
+			accumulator += deviceGaussianFilterMask[(2 + i)* 3 + (2 + j)] * tex2D(deviceMatrixTexture, matrixColumn, outputRow + j);
 		}
 	}
 	
@@ -99,27 +95,25 @@ void performConvolutionGpu(const float* inputMatrix, int matrixWidth, float* out
 	unsigned matrixMemorySize = matrixWidth * matrixWidth * sizeof(float);
 	
 	// Set up device arrays.
-	//cudaArray* deviceMatrixArray = NULL;
+	cudaArray* deviceMatrixArray = NULL;
 	float* deviceOutputArray = NULL;
 	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float>();
-	//cudaMallocArray(&deviceMatrixArray, &channelDesc, matrixWidth, matrixWidth);
-	CUDA_SAFE_CALL(cudaMalloc((void**)&deviceMatrixArray, matrixMemorySize));
+	cudaMallocArray(&deviceMatrixArray, &channelDesc, matrixWidth, matrixWidth);
 	CUDA_SAFE_CALL(cudaMalloc((void**)&deviceOutputArray, matrixMemorySize));
 
 	// Copy inputs to device.
-	//CUDA_SAFE_CALL(cudaMemcpyToArray(deviceMatrixArray, 0, 0, inputMatrix, matrixMemorySize, cudaMemcpyHostToDevice));
-	CUDA_SAFE_CALL(cudaMemcpyToSymbol(deviceMatrixArray, inputMatrix, matrixMemorySize, cudaMemcpyHostToDevice));
+	CUDA_SAFE_CALL(cudaMemcpyToArray(deviceMatrixArray, 0, 0, inputMatrix, matrixMemorySize, cudaMemcpyHostToDevice));
 
 	// Set up image matrix as a texture.
-	//deviceMatrixTexture.addressMode[0] = cudaAddressModeClamp;
-	//deviceMatrixTexture.addressMode[1] = cudaAddressModeClamp;
-	//cudaBindTextureToArray(deviceMatrixTexture, deviceMatrixArray);
+	deviceMatrixTexture.addressMode[0] = cudaAddressModeClamp;
+	deviceMatrixTexture.addressMode[1] = cudaAddressModeClamp;
+	cudaBindTextureToArray(deviceMatrixTexture, deviceMatrixArray);
 
 	// Start timer.
 	CUT_SAFE_CALL(cutStartTimer(timer));
 
 	// Do it!
-	dim3 dimGrid(matrixWidth, matrixWidth);
+	dim3 dimGrid(matrixWidth / 16, matrixWidth / 16);
 	dim3 dimBlock(16, 16);
 	switch(type)
 	{
@@ -145,8 +139,7 @@ void performConvolutionGpu(const float* inputMatrix, int matrixWidth, float* out
     //printf("Processing time for %dx%d matrix: %f ms\n", matrixWidth, matrixWidth, cutGetTimerValue(timer));
     CUT_SAFE_CALL(cutDeleteTimer(timer));
 
-	//CUDA_SAFE_CALL(cudaFreeArray(deviceMatrixArray));
-	CUDA_SAFE_CALL(cudaFree(deviceMatrixArray));
+	CUDA_SAFE_CALL(cudaFreeArray(deviceMatrixArray));
 	CUDA_SAFE_CALL(cudaFree(deviceOutputArray));
-	//CUDA_SAFE_CALL(cudaUnbindTexture(deviceMatrixTexture));
+	CUDA_SAFE_CALL(cudaUnbindTexture(deviceMatrixTexture));
 }
