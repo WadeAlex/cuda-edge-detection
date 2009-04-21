@@ -8,12 +8,14 @@
 
 using namespace std;
 
+#define USE_GPU
+
 EdgeDetection::EdgeDetection()
 :
 	xGradient(NULL),
 	yGradient(NULL)
 {
-
+	initializeDevice();
 }
 
 EdgeDetection::~EdgeDetection()
@@ -30,13 +32,13 @@ void EdgeDetection::performEdgeDetection()
 {
 	// Perform smoothing
 	smoothImage();
-	//this->imgHandler.writeImage(this->imgHandler.getMatrix(), "smoothed.png", false);
-
+	this->imgHandler.writeImage(this->imgHandler.getMatrix(), "smoothed.png", true);
+	return;
 	// Compute image gradient
 	float* gradientMagnitude = new float[this->imgHandler.getImagePixelCount()];
 	computeImageGradient(gradientMagnitude);
 	//this->imgHandler.writeImage(gradientMagnitude, "gradient.png", false);
-	
+
 	// Compute edge directions
 	float* edgeDirections = new float[this->imgHandler.getImagePixelCount()];
 	computeEdgeDirections(edgeDirections);
@@ -71,8 +73,13 @@ void EdgeDetection::computeImageGradient(float* outputImageGradient)
 	this->xGradient = new float[this->imgHandler.getImagePixelCount()];
 	this->yGradient = new float[this->imgHandler.getImagePixelCount()];
 
+#ifdef USE_GPU
+	performConvolutionGpu(this->imgHandler.getMatrix(), this->imgHandler.getImageWidth(), xGradient, X_GRADIENT);
+	performConvolutionGpu(this->imgHandler.getMatrix(), this->imgHandler.getImageWidth(), yGradient, Y_GRADIENT);
+#else
 	performConvolution(this->imgHandler.getMatrix(), this->imgHandler.getImageWidth(), this->xGradientMask, 3, 4, xGradient);
 	performConvolution(this->imgHandler.getMatrix(), this->imgHandler.getImageWidth(), this->yGradientMask, 3, 4, yGradient);
+#endif
 
 	for(unsigned i = 0; i < this->imgHandler.getImageWidth(); ++i)
 	{
@@ -314,6 +321,15 @@ void EdgeDetection::visitNeighbors(int i, int j, float lowThreshold, float* grad
 void EdgeDetection::smoothImage()
 {
 	float* outputMatrix = new float[this->imgHandler.getImagePixelCount()];
+#ifdef USE_GPU
+	performConvolutionGpu
+	(
+		this->imgHandler.getMatrix(),
+		this->imgHandler.getImageWidth(),
+		outputMatrix,
+		GAUSSIAN
+	);
+#else
 	performConvolution
 	(
 		this->imgHandler.getMatrix(), 
@@ -323,7 +339,7 @@ void EdgeDetection::smoothImage()
 		gaussianMaskWeight,
 		outputMatrix
 	);
-
+#endif
 	this->imgHandler.setMatrix(outputMatrix);
 }
 
@@ -387,7 +403,7 @@ const float EdgeDetection::gaussianMask[25] =
 };
 
 const float EdgeDetection::gaussianMaskWeight = 159;
-
+void startIt();
 int main(char** argv, int argc)
 {
 	/*if(argc != 3)

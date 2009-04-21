@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _EDGE_DETECTION_H_INCLUDED
+#define _EDGE_DETECTION_H_INCLUDED
 
 #include "ImageHandler.h"
 
@@ -36,3 +37,5 @@ class EdgeDetection
 		float* yGradient;
 		stdext::hash_set<unsigned> visitedPixels;
 };
+
+#endif

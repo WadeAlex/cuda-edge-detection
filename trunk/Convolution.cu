@@ -4,15 +4,14 @@
 
 #include <cutil.h>
 
-// A_DIMENSION should be the actual a dimension + 2 because both sides of the input matrix are padded with zeroes.
-#define A_DIMENSION 258
-#define H_DIMENSION 7
-#define C_DIMENSION A_DIMENSION
+#include "Convolution.h"
 
-texture<float, 2, cudaReadModeElementType> deviceATexture;
-__device__ __constant__ float deviceH[H_DIMENSION * H_DIMENSION];
+texture<float, 2, cudaReadModeElementType> deviceMatrixTexture;
+__device__ __constant__ float deviceXGradientMask[9];
+__device__ __constant__ float deviceYGradientMask[9];
+__device__ __constant__ float deviceGaussianFilterMask[25];
 
-__global__ void convolution(float* c)
+__global__ void deviceXGradientConvolution(float* output, unsigned matrixWidth)
 {
 	int outputRow = blockIdx.y;
 	int outputColumn = blockIdx.x;
@@ -20,85 +19,127 @@ __global__ void convolution(float* c)
 	float accumulator = 0.0;
 
 #pragma unroll
-	for(unsigned i = 0; i < H_DIMENSION; ++i)
+	for(int i = -1; i <= 1; ++i)
 	{
-		unsigned aColumn = outputColumn - i;
+		unsigned matrixColumn = outputColumn + i;
 #pragma unroll
-		for(unsigned j = 0; j < H_DIMENSION; ++j)
+		for(int j = -1; j <= 1; ++j)
 		{
-			accumulator += deviceH[i * H_DIMENSION + j] * tex2D(deviceATexture, aColumn, outputRow - j);
+			accumulator += deviceXGradientMask[(1 + i)* 3 + (1 + j)] * tex2D(deviceMatrixTexture, matrixColumn, outputRow + j);
 		}
 	}
 
-	c[outputRow * C_DIMENSION + outputColumn] = accumulator;
+	output[outputRow * matrixWidth + outputColumn] = accumulator;
 }
 
-void performConvolution(float* kernel, float* image, float* result)
+__global__ void deviceYGradientConvolution(float* output, unsigned matrixWidth)
 {
-	srand((unsigned)time(NULL));
+	int outputRow = blockIdx.y;
+	int outputColumn = blockIdx.x;
 
+	float accumulator = 0.0;
+
+#pragma unroll
+	for(int i = -1; i <= 1; ++i)
+	{
+		unsigned matrixColumn = outputColumn + i;
+#pragma unroll
+		for(int j = -1; j <= 1; ++j)
+		{
+			accumulator += deviceYGradientMask[(1 + i)* 3 + (1 + j)] * tex2D(deviceMatrixTexture, matrixColumn, outputRow + j);
+		}
+	}
+
+	output[outputRow * matrixWidth + outputColumn] = accumulator;
+}
+
+__global__ void deviceGaussianConvolution(float* output, unsigned matrixWidth)
+{
+	int outputRow = blockIdx.y;
+	int outputColumn = blockIdx.x;
+ 
+	float accumulator = 0.0;
+
+#pragma unroll
+	for(int i = -2; i <= 2; ++i)
+	{
+		unsigned matrixColumn = outputColumn + i;
+#pragma unroll
+		for(int j = -2; j <= 2; ++j)
+		{
+			accumulator += deviceGaussianFilterMask[(2 + i)* 3 + (2 + j)] * tex2D(deviceMatrixTexture, matrixColumn, outputRow + j);
+		}
+	}
+	
+	output[outputRow * matrixWidth + outputColumn] = accumulator / 159;
+}
+
+void initializeDevice()
+{
+	unsigned gradientMaskSize = 9 * sizeof(float);
+	unsigned gaussianMaskSize = 25 * sizeof(float);
+
+	// Copy kernels to device.
+	CUDA_SAFE_CALL(cudaMemcpyToSymbol(deviceXGradientMask, xGradientMask, gradientMaskSize, 0, cudaMemcpyHostToDevice));
+	CUDA_SAFE_CALL(cudaMemcpyToSymbol(deviceYGradientMask, yGradientMask, gradientMaskSize, 0, cudaMemcpyHostToDevice));
+	CUDA_SAFE_CALL(cudaMemcpyToSymbol(deviceGaussianFilterMask, gaussianMask, gaussianMaskSize, 0, cudaMemcpyHostToDevice));
+}
+
+void performConvolutionGpu(const float* inputMatrix, int matrixWidth, float* outputMatrix, ConvolutionType type)
+{
 	// Create timer.
     unsigned int timer = 0;
     CUT_SAFE_CALL(cutCreateTimer(&timer));
 
 	// Compute memory sizes.
-	unsigned memSizeA = A_DIMENSION * A_DIMENSION * sizeof(float);
-	unsigned memSizeH = H_DIMENSION * H_DIMENSION * sizeof(float);
-	unsigned memSizeC = memSizeA;
-
-	// Allocate and initialize host memory.
-	float* hostA = (float*)malloc(memSizeA);
-	float* hostH = (float*)malloc(memSizeH);
-	float* hostC = (float*)calloc(1, memSizeC);
-
-	//populateMatrix(hostA, A_DIMENSION, 7.0, true);
-	//populateMatrix(hostH, H_DIMENSION, 3.0, false);
-
+	unsigned matrixMemorySize = matrixWidth * matrixWidth * sizeof(float);
+	
 	// Set up device arrays.
-	cudaArray* deviceAArray = NULL;
-	float* deviceCArray = NULL;
+	cudaArray* deviceMatrixArray = NULL;
+	float* deviceOutputArray = NULL;
 	cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float>();
-	cudaMallocArray(&deviceAArray, &channelDesc, A_DIMENSION, A_DIMENSION);
-	CUDA_SAFE_CALL(cudaMalloc((void**)&deviceCArray, memSizeC));
+	cudaMallocArray(&deviceMatrixArray, &channelDesc, matrixWidth, matrixWidth);
+	CUDA_SAFE_CALL(cudaMalloc((void**)&deviceOutputArray, matrixMemorySize));
 
 	// Copy inputs to device.
-	CUDA_SAFE_CALL(cudaMemcpyToSymbol(deviceH, hostH, memSizeH, 0, cudaMemcpyHostToDevice));
-	CUDA_SAFE_CALL(cudaMemcpyToArray(deviceAArray, 0, 0, hostA, memSizeA, cudaMemcpyHostToDevice));
+	CUDA_SAFE_CALL(cudaMemcpyToArray(deviceMatrixArray, 0, 0, inputMatrix, matrixMemorySize, cudaMemcpyHostToDevice));
 
-	// Set up A and  H as device textures.
-	deviceATexture.addressMode[0] = cudaAddressModeClamp;
-	deviceATexture.addressMode[1] = cudaAddressModeClamp;
-	cudaBindTextureToArray(deviceATexture, deviceAArray);
+	// Set up image matrix as a texture.
+	deviceMatrixTexture.addressMode[0] = cudaAddressModeClamp;
+	deviceMatrixTexture.addressMode[1] = cudaAddressModeClamp;
+	cudaBindTextureToArray(deviceMatrixTexture, deviceMatrixArray);
 
 	// Start timer.
 	CUT_SAFE_CALL(cutStartTimer(timer));
 
 	// Do it!
-	dim3 dimGrid(C_DIMENSION, C_DIMENSION);
+	dim3 dimGrid(matrixWidth, matrixWidth);
 	dim3 dimBlock(16, 16);
-	convolution<<<dimGrid, dimBlock>>>(deviceCArray);
+	switch(type)
+	{
+		case GAUSSIAN:
+			deviceGaussianConvolution<<<dimGrid, dimBlock>>>(deviceOutputArray, matrixWidth);
+			break;
+		case X_GRADIENT:
+			deviceXGradientConvolution<<<dimGrid, dimBlock>>>(deviceOutputArray, matrixWidth);
+			break;
+		case Y_GRADIENT:
+			deviceYGradientConvolution<<<dimGrid, dimBlock>>>(deviceOutputArray, matrixWidth);
+			break;
+	}
 
 	// Check for errors.
 	CUT_CHECK_ERROR("Kernel execution failed!");
 
 	// Copy device result to host.
-	CUDA_SAFE_CALL(cudaMemcpy(hostC, deviceCArray, memSizeC, cudaMemcpyDeviceToHost));
+	CUDA_SAFE_CALL(cudaMemcpy(outputMatrix, deviceOutputArray, matrixMemorySize, cudaMemcpyDeviceToHost));
 
 	// Stop and destroy timer, print results.
     CUT_SAFE_CALL(cutStopTimer(timer));
-    printf("Processing time for %dx%d matrix: %f ms\n", A_DIMENSION, A_DIMENSION, cutGetTimerValue(timer));
+    printf("Processing time for %dx%d matrix: %f ms\n", matrixWidth, matrixWidth, cutGetTimerValue(timer));
     CUT_SAFE_CALL(cutDeleteTimer(timer));
 
-	// Free memory.
-	free(hostA);
-	free(hostH);
-	free(hostC);
-
-	CUDA_SAFE_CALL(cudaFreeArray(deviceAArray));
-	CUDA_SAFE_CALL(cudaFree(deviceCArray));
-	CUDA_SAFE_CALL(cudaUnbindTexture(deviceATexture));
-
-	// Wait for user to press key.
-	printf("Press a key to continue...\n");
-	getc(stdin);
+	CUDA_SAFE_CALL(cudaFreeArray(deviceMatrixArray));
+	CUDA_SAFE_CALL(cudaFree(deviceOutputArray));
+	CUDA_SAFE_CALL(cudaUnbindTexture(deviceMatrixTexture));
 }
