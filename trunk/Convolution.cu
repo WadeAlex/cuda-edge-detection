@@ -113,8 +113,8 @@ void performConvolutionGpu(const float* inputMatrix, int matrixWidth, float* out
 	CUT_SAFE_CALL(cutStartTimer(timer));
 
 	// Do it!
-	dim3 dimGrid(matrixWidth / 16, matrixWidth / 16);
-	dim3 dimBlock(16, 16);
+	dim3 dimGrid(matrixWidth / 256, matrixWidth / 256);
+	dim3 dimBlock(256, 256);
 	switch(type)
 	{
 		case GAUSSIAN:
@@ -136,7 +136,7 @@ void performConvolutionGpu(const float* inputMatrix, int matrixWidth, float* out
 
 	// Stop and destroy timer, print results.
     CUT_SAFE_CALL(cutStopTimer(timer));
-    //printf("Processing time for %dx%d matrix: %f ms\n", matrixWidth, matrixWidth, cutGetTimerValue(timer));
+    printf("Processing time for %dx%d matrix: %f ms\n", matrixWidth, matrixWidth, cutGetTimerValue(timer));
     CUT_SAFE_CALL(cutDeleteTimer(timer));
 
 	CUDA_SAFE_CALL(cudaFreeArray(deviceMatrixArray));
