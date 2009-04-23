@@ -9,7 +9,7 @@
 
 using namespace std;
 
-//#define USE_GPU
+#define USE_GPU
 
 EdgeDetection::EdgeDetection()
 :
@@ -59,7 +59,7 @@ void EdgeDetection::performEdgeDetection()
 	memset(outputEdges, 0, sizeof(float) * this->imgHandler.getImagePixelCount());
 	performHysteresis(gradientMagnitude, 11000.0, 25.0, outputEdges);
 	stopTimer();
-	cout << "Total time was: " << getElapsedTime() * 1000;
+	//cout << "Total time was: " << getElapsedTime() * 1000;
 
 	this->imgHandler.writeImage(outputEdges, "edges.png", false);
 
@@ -103,7 +103,7 @@ void EdgeDetection::computeEdgeDirections(float* outputEdgeDirections) const
 #ifdef USE_GPU
 		outputEdgeDirections[i] = static_cast<float>(atan2(yGradient[i], xGradient[i]) * (180 / 3.14159265) + 180.0);
 #else
-		outputEdgeDirections[i] = static_cast<float>(atan2(xGradient[i], yGradient[i]) * (180 / 3.14159265) + 180.0);
+ 		outputEdgeDirections[i] = static_cast<float>(atan2(xGradient[i], yGradient[i]) * (180 / 3.14159265) + 180.0);
 #endif
 	}
 }
@@ -430,7 +430,7 @@ int main(char** argv, int argc)
 
 	EdgeDetection edgeDetector;
 
-	edgeDetector.loadInputImage(/*argv[0]*/"C:\\Documents and Settings\\awade\\Desktop\\NVIDIA CUDA SDK\\projects\\EdgeDetection\\test-2048.png");
+	edgeDetector.loadInputImage(/*argv[0]*/"C:\\Documents and Settings\\awade\\Desktop\\NVIDIA CUDA SDK\\projects\\EdgeDetection\\test.png");
 	edgeDetector.performEdgeDetection();
 	edgeDetector.exportEdgeImage(/*argv[1]*/"");
 
