@@ -6,15 +6,16 @@
 #include <iostream>
 #include <cmath>
 #include <limits>
+#include <sstream>
 
 using namespace std;
-
-#define USE_GPU
 
 EdgeDetection::EdgeDetection()
 :
 	xGradient(NULL),
-	yGradient(NULL)
+	yGradient(NULL),
+	gradient(NULL),
+	edgeDirections(NULL)
 {
 	initializeDevice();
 }
@@ -24,95 +25,93 @@ EdgeDetection::~EdgeDetection()
 
 }
 
-void EdgeDetection::loadInputImage(const char* filename)
+void EdgeDetection::loadInputImage(string filename)
 {
 	this->imgHandler.loadImage(filename);
 }
 
 void EdgeDetection::performEdgeDetection()
 {
-	// Perform smoothing
 	startTimer();
-	smoothImage();
-	//this->imgHandler.writeImage(this->imgHandler.getMatrix(), "smoothed.png", true);
-	//return;
-	// Compute image gradient
-	float* gradientMagnitude = new float[this->imgHandler.getImagePixelCount()];
-	computeImageGradient(gradientMagnitude);
-	//this->imgHandler.writeImage(gradientMagnitude, "gradient.png", true);
 
+	// Perform smoothing
+#ifndef USE_GPU
+	smoothImage();
+#endif
+
+	// Compute image gradient
+	computeImageGradient();
+	//this->imgHandler.writeImage(this->gradient, "gradient.png", false);
+#ifndef USE_GPU
 	// Compute edge directions
-	float* edgeDirections = new float[this->imgHandler.getImagePixelCount()];
-	computeEdgeDirections(edgeDirections);
+	computeEdgeDirections();
 
 	// Snap and classify edge directions
-	unsigned* edgeDirectionClassifications = new unsigned[this->imgHandler.getImagePixelCount()];
-	classifyEdgeDirections(edgeDirections, edgeDirectionClassifications);
-
+	classifyEdgeDirections();
+#endif
+	stopTimer();
+	cout << "Total time was: " << getElapsedTime() * 1000;
 	// Perform nonmaximum suppression
-	suppressNonmaximums(gradientMagnitude, edgeDirectionClassifications);
+	suppressNonmaximums();
+
 	//this->imgHandler.writeImage(gradientMagnitude, "nonmaximumSuppression.png", true);
 	//this->imgHandler.writeEdgeDirectionImage(edgeDirectionClassifications, gradientMagnitude, "edgeDirections.png", 5000);
 
 	// Perform hysteresis
 	float* outputEdges = new float[this->imgHandler.getImagePixelCount()];
 	memset(outputEdges, 0, sizeof(float) * this->imgHandler.getImagePixelCount());
-	performHysteresis(gradientMagnitude, 11000.0, 25.0, outputEdges);
-	stopTimer();
-	//cout << "Total time was: " << getElapsedTime() * 1000;
+#ifdef USE_GPU
+	performHysteresis(this->gradient, 16000.0, 300.0, outputEdges);
+#else
+	performHysteresis(this->gradient, 3300.0, 300.0, outputEdges);
+	//performHysteresis(this->gradient, 16000.0, 30.0, outputEdges);
+#endif
 
 	this->imgHandler.writeImage(outputEdges, "edges.png", false);
 
-	delete[] gradientMagnitude;
-	delete[] edgeDirections;
-	delete[] edgeDirectionClassifications;
+	delete[] this->gradient;
+#ifndef USE_GPU
+	delete[] this->edgeDirections;
+#endif
 }
 
-void EdgeDetection::exportEdgeImage(const char* filename) const
-{
-
-}
-
-void EdgeDetection::computeImageGradient(float* outputImageGradient)
+void EdgeDetection::computeImageGradient()
 { 
-	this->xGradient = new float[this->imgHandler.getImagePixelCount()];
-	this->yGradient = new float[this->imgHandler.getImagePixelCount()];
+	this->gradient = new float[this->imgHandler.getImagePixelCount()];
+	this->edgeDirectionClassifications = new unsigned[this->imgHandler.getImagePixelCount()];
 
 #ifdef USE_GPU
-	performConvolutionGpu(this->imgHandler.getMatrix(), this->imgHandler.getImageWidth(), xGradient, X_GRADIENT);
-	performConvolutionGpu(this->imgHandler.getMatrix(), this->imgHandler.getImageWidth(), yGradient, Y_GRADIENT);
+	computeGradient(this->imgHandler.getMatrix(), this->imgHandler.getImageWidth(), gradient, edgeDirectionClassifications);
 #else
+	this->xGradient = new float[this->imgHandler.getImagePixelCount()];
+	this->yGradient = new float[this->imgHandler.getImagePixelCount()];
 	performConvolution(this->imgHandler.getMatrix(), this->imgHandler.getImageWidth(), this->xGradientMask, 3, 4, xGradient);
 	performConvolution(this->imgHandler.getMatrix(), this->imgHandler.getImageWidth(), this->yGradientMask, 3, 4, yGradient);
-#endif
-
 	for(unsigned i = 0; i < this->imgHandler.getImageWidth(); ++i)
 	{
 		for(unsigned j = 0; j < this->imgHandler.getImageWidth(); ++j)
 		{
 			unsigned matrixIndex = i * this->imgHandler.getImageWidth() + j;
-			outputImageGradient[matrixIndex] = fabs(xGradient[matrixIndex]) + fabs(yGradient[matrixIndex]);
+			this->gradient[matrixIndex] = fabs(xGradient[matrixIndex]) + fabs(yGradient[matrixIndex]);
 		}
 	}
+#endif
 }
 
-void EdgeDetection::computeEdgeDirections(float* outputEdgeDirections) const
+void EdgeDetection::computeEdgeDirections()
 {
+	this->edgeDirections = new float[this->imgHandler.getImagePixelCount()];
 	for(unsigned i = 0; i < this->imgHandler.getImagePixelCount(); ++i)
 	{
-#ifdef USE_GPU
-		outputEdgeDirections[i] = static_cast<float>(atan2(yGradient[i], xGradient[i]) * (180 / 3.14159265) + 180.0);
-#else
- 		outputEdgeDirections[i] = static_cast<float>(atan2(xGradient[i], yGradient[i]) * (180 / 3.14159265) + 180.0);
-#endif
+ 		this->edgeDirections[i] = static_cast<float>(atan2(xGradient[i], yGradient[i]) * (180 / 3.14159265) + 180.0);
 	}
 }
 
-void EdgeDetection::classifyEdgeDirections(float* edgeDirections, unsigned* edgeDirectionClassifications) const
+void EdgeDetection::classifyEdgeDirections() const
 {
 	for(unsigned i = 0; i < this->imgHandler.getImagePixelCount(); ++i)
 	{
-		float edgeDirection = edgeDirections[i];
+		float edgeDirection = this->edgeDirections[i];
 		if(
 			(edgeDirection >= 0.0 && edgeDirection < 22.5) ||
 			(edgeDirection >= 157.5 && edgeDirection < 202.5) || 
@@ -145,7 +144,7 @@ void EdgeDetection::classifyEdgeDirections(float* edgeDirections, unsigned* edge
 	}
 }
 
-void EdgeDetection::suppressNonmaximums(float* imageGradient, unsigned* edgeDirectionClassifications) const
+void EdgeDetection::suppressNonmaximums() const
 {
 	for(unsigned i = 0; i < imgHandler.getImageWidth(); ++i)
 	{
@@ -163,7 +162,7 @@ void EdgeDetection::suppressNonmaximums(float* imageGradient, unsigned* edgeDire
 			}
 			else
 			{
-				clockwisePerpendicularValue = imageGradient[clockwisePerpendicularIndex];
+				clockwisePerpendicularValue = this->gradient[clockwisePerpendicularIndex];
 			}
 			//cout << clockwisePerpendicularValue << "." << endl;
 			int counterClockwisePerpendicularIndex = 
@@ -178,18 +177,18 @@ void EdgeDetection::suppressNonmaximums(float* imageGradient, unsigned* edgeDire
 				if(counterClockwisePerpendicularIndex < static_cast<int>(this->imgHandler.getImagePixelCount()) &&
 					counterClockwisePerpendicularIndex >= 0)
 				{
-					counterClockwisePerpendicularValue = imageGradient[counterClockwisePerpendicularIndex];
+					counterClockwisePerpendicularValue = this->gradient[counterClockwisePerpendicularIndex];
 				}
 			}
 			//cout << counterClockwisePerpendicularValue << "." << endl;
 			if
 			(
-				imageGradient[pixelIndex] <= clockwisePerpendicularValue ||
-				imageGradient[pixelIndex] <= counterClockwisePerpendicularValue
+				this->gradient[pixelIndex] <= clockwisePerpendicularValue ||
+				this->gradient[pixelIndex] <= counterClockwisePerpendicularValue
 			)
 			{
 				//cout << "\tPixel suppressed." << endl;
-				imageGradient[pixelIndex] = 0;
+				this->gradient[pixelIndex] = 0;
 			}
 			else
 			{
@@ -334,15 +333,6 @@ void EdgeDetection::visitNeighbors(int i, int j, float lowThreshold, float* grad
 void EdgeDetection::smoothImage()
 {
 	float* outputMatrix = new float[this->imgHandler.getImagePixelCount()];
-#ifdef USE_GPU
-	performConvolutionGpu
-	(
-		this->imgHandler.getMatrix(),
-		this->imgHandler.getImageWidth(),
-		outputMatrix,
-		GAUSSIAN
-	);
-#else
 	performConvolution
 	(
 		this->imgHandler.getMatrix(), 
@@ -352,7 +342,6 @@ void EdgeDetection::smoothImage()
 		gaussianMaskWeight,
 		outputMatrix
 	);
-#endif
 	this->imgHandler.setMatrix(outputMatrix);
 }
 
@@ -377,17 +366,10 @@ void EdgeDetection::performConvolution(const float* inputMatrix, int matrixWidth
 
 					if(matrixRow >= 0 && matrixColumn >= 0 && matrixRow < matrixWidth && matrixColumn < matrixWidth)
 					{
-						//cout << "\tMatrix[" << matrixRow << ", " << matrixColumn <<
-						//	"](index: " << matrixIndex << "); Mask[" << maskRow << ", " << maskColumn << "]; Output[" <<
-						//	outputRow << ", " << outputColumn << "]" << endl;
-						//cout << "\t" << mask[maskIndex] << "*" << inputMatrix[matrixIndex] << "=" << mask[maskIndex] * inputMatrix[matrixIndex] << endl;
 						accumulator += mask[maskIndex] * inputMatrix[matrixIndex];
 					}
 				}
 			}
-			//cout << "Input: " << inputMatrix[outputRow * matrixWidth + outputColumn] <<
-			//	"(index: " << outputRow * matrixWidth + outputColumn <<
-			//	"), Output: " << accumulator / gaussianMaskWeight << endl;
 			outputMatrix[outputRow * matrixWidth + outputColumn] = accumulator / maskWeight;
 		}
 	}
@@ -430,9 +412,11 @@ int main(char** argv, int argc)
 
 	EdgeDetection edgeDetector;
 
-	edgeDetector.loadInputImage(/*argv[0]*/"C:\\Documents and Settings\\awade\\Desktop\\NVIDIA CUDA SDK\\projects\\EdgeDetection\\test.png");
+	stringstream filename;
+	filename << "C:\\Documents and Settings\\awade\\Desktop\\NVIDIA CUDA SDK\\projects\\EdgeDetection\\test-"
+		<< IMAGE_WIDTH << ".png";
+	edgeDetector.loadInputImage(/*argv[0]*/filename.str());
 	edgeDetector.performEdgeDetection();
-	edgeDetector.exportEdgeImage(/*argv[1]*/"");
 
 	cout << "Press any key to exit..." << endl;
 	getchar();

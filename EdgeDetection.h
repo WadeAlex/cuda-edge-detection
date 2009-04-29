@@ -11,9 +11,8 @@ class EdgeDetection
 		EdgeDetection();
 		~EdgeDetection();
 
-		void loadInputImage(const char* filename);
+		void loadInputImage(string filename);
 		void performEdgeDetection();
-		void exportEdgeImage(const char* filename) const;
 
 		static const float xGradientMask[9];
 		static const float yGradientMask[9];
@@ -22,10 +21,10 @@ class EdgeDetection
 
 	private:
 		void smoothImage();
-		void computeImageGradient(float* outputImageGradient);
-		void computeEdgeDirections(float* outputEdgeDirections) const;
-		void classifyEdgeDirections(float* edgeDirections, unsigned* edgeDirectionClassifications) const;
-		void suppressNonmaximums(float* imageGradient, unsigned* edgeDirectionClassifications) const;
+		void computeImageGradient();
+		void computeEdgeDirections();
+		void classifyEdgeDirections() const;
+		void suppressNonmaximums() const;
 		void performConvolution(const float* inputMatrix, int matrixWidth, const float* mask, int maskWidth, float maskWeight, float* outputMatrix) const;
 		void performHysteresis(float* gradientImage, float highThreshold, float lowThreshold, float* outputEdges);
 		int getCounterClockwisePerpendicularIndex(unsigned i, unsigned j, unsigned edgeDirectionClassification) const;
@@ -35,6 +34,9 @@ class EdgeDetection
 		ImageHandler imgHandler;
 		float* xGradient;
 		float* yGradient;
+		float* gradient;
+		float* edgeDirections;
+		unsigned* edgeDirectionClassifications;
 		stdext::hash_set<unsigned> visitedPixels;
 };
 
