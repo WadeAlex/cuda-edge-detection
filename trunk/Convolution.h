@@ -1,11 +1,10 @@
 #pragma once
 
-enum ConvolutionType
-{
-	GAUSSIAN,
-	X_GRADIENT,
-	Y_GRADIENT
-};
+#define IMAGE_WIDTH 256
+
+#define IMAGE_SIZE IMAGE_WIDTH * IMAGE_WIDTH
+
+//#define USE_GPU
 
 const float xGradientMask[9] = 
 {
@@ -31,4 +30,4 @@ const float gaussianMask[25] =
 };
 
 void initializeDevice();
-void performConvolutionGpu(const float* inputMatrix, int matrixWidth, float* outputMatrix, ConvolutionType type);
+void computeGradient(const float* inputMatrix, int matrixWidth, float* outputGradient, unsigned* outputEdgeDirectionClassifications);
