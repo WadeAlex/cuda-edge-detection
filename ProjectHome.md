@@ -1,0 +1,1 @@
+C++/CUDA based implementation of Canny edge detection.  This is for a course project.
